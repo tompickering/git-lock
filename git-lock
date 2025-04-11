@@ -12,10 +12,11 @@ REMOTE=${REMOTE_CFG:-origin}
 BRANCH="git-lock"
 BRANCHPATH="refs/heads/${BRANCH}"
 BRANCHREMOTE="refs/remotes/${REMOTE}/${BRANCH}"
-LOCKFILE="git-lock"
+LOCKFILE=".git-lock"
 MSG="Update git-lock"
 TOPLEVEL="$(realpath "$(git rev-parse --show-toplevel)")"
 TOPLEVEL_C="$(echo "$TOPLEVEL" | wc -c)"
+USER=$(git config user.name)
 
 ORIG_PWD="$(pwd -P)"
 pushd "$TOPLEVEL" >> /dev/null
@@ -25,6 +26,8 @@ git_lock_init_local() {
     current=$(cat .git/HEAD)
     git checkout --orphan "$BRANCH" >> /dev/null
     git reset
+    # Add a throwaway file to add to our commit
+    # An empty commit here can confuse checkout of worktree
     true > "$LOCKFILE"
     git add "$LOCKFILE" >> /dev/null
     git commit -m "Init git-lock" >> /dev/null
@@ -57,14 +60,13 @@ git_lock_acquire() {
 
     git_lock_fetch
 
-    grep -Fx "${path}" "$WORKTREE/$LOCKFILE" >> /dev/null
-
-    if [[ $? -eq 0 ]]; then
-        echo "Lock is held"
+    if [[ -e "$path" ]]; then
+        owner=$(head -n 1 "$path")
+        echo "Lock is held by ${owner}"
         exit
     fi
 
-    echo "$path" >> "$WORKTREE/$LOCKFILE"
+    echo "$USER" >> "$path"
 }
 
 git fetch >> /dev/null 2>&1
@@ -100,7 +102,7 @@ WORKTREE="$TMPDIR/tree"
 mkdir -p "$WORKTREE"
 
 if git show-ref --quiet "$BRANCHPATH"; then
-    git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- "$LOCKFILE"
+    git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- .
 fi
 
 if [[ "$cmd" == "acquire" ]]; then
@@ -127,11 +129,11 @@ if [[ "$cmd" == "acquire" ]]; then
         exit
     fi
 
-    git_lock_acquire "$to_lock"
+    git_lock_acquire "$WORKTREE/$to_lock"
 
-    blob=$(git hash-object -w "$WORKTREE/$LOCKFILE")
+    blob=$(git hash-object -w "$WORKTREE/$to_lock")
 
-    tree=$(echo "100644 blob $blob	$LOCKFILE" | git mktree)
+    tree=$(echo "100644 blob $blob	$to_lock" | git mktree)
 
     parent=$(git rev-parse "$BRANCHPATH")
     commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
@@ -141,16 +143,3 @@ if [[ "$cmd" == "acquire" ]]; then
     git_lock_push
     exit
 fi
-
-echo "Updated at $(date)" >> "$WORKTREE/$LOCKFILE"
-
-blob=$(git hash-object -w "$WORKTREE/$LOCKFILE")
-
-tree=$(echo "100644 blob $blob	$LOCKFILE" | git mktree)
-
-parent=$(git rev-parse "$BRANCHPATH")
-commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
-
-git update-ref "$BRANCHPATH" "$commit"
-
-git_lock_push
