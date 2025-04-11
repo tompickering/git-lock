@@ -46,6 +46,10 @@ git_lock_push() {
     echo "Lock updated"
 }
 
+git_lock_fetch() {
+    git fetch "$REMOTE" "${BRANCH}:${BRANCH}" >> /dev/null
+}
+
 git fetch >> /dev/null 2>&1
 
 git rev-parse "$BRANCHREMOTE" >> /dev/null 2>&1
@@ -60,7 +64,7 @@ if [[ ! $? -eq 0 ]]; then
     git_lock_push
 fi
 
-git fetch "$REMOTE" "${BRANCH}:${BRANCH}" >> /dev/null
+git_lock_fetch
 
 # --- git-lock init is assured ---
 
