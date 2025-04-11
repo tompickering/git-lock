@@ -1,0 +1,93 @@
+#!/bin/bash
+
+git rev-parse --is-inside-work-tree >> /dev/null 2>&1
+
+if [[ ! $? -eq 0 ]]; then
+    echo "Not inside a git repo"
+    exit
+fi
+
+REMOTE_CFG="$(git config lock.remote)"
+REMOTE=${REMOTE_CFG:-origin}
+BRANCH="git-lock"
+BRANCHPATH="refs/heads/${BRANCH}"
+BRANCHREMOTE="refs/remotes/${REMOTE}/${BRANCH}"
+LOCKFILE="git-lock"
+MSG="Update git-lock"
+
+git_lock_init_local() {
+    echo "Creating locking branch..."
+    current=$(cat .git/HEAD)
+    git checkout --orphan "$BRANCH" >> /dev/null
+    git reset
+    true > "$LOCKFILE"
+    git add "$LOCKFILE" >> /dev/null
+    git commit -m "Init git-lock" >> /dev/null
+    echo "$current" > .git/HEAD
+    git reset
+    git clean -f "$LOCKFILE" >> /dev/null
+}
+
+git_lock_show() {
+    git show "$BRANCH:$LOCKFILE" | cat
+}
+
+git_lock_push() {
+    git push "$REMOTE" "$BRANCHPATH:$BRANCHPATH" >> /dev/null 2>&1
+
+    if [[ ! $? -eq 0 ]]; then
+        echo "Unable to push locking branch to $REMOTE"
+        exit
+    fi
+
+    echo "Lock updated"
+}
+
+git fetch >> /dev/null 2>&1
+
+git rev-parse "$BRANCHREMOTE" >> /dev/null 2>&1
+
+if [[ ! $? -eq 0 ]]; then
+    git rev-parse "$BRANCHREMOTE" >> /dev/null 2>&1
+
+    if [[ ! $? -eq 0 ]]; then
+        git_lock_init_local
+    fi
+
+    git_lock_push
+fi
+
+git fetch "$REMOTE" "${BRANCH}:${BRANCH}" >> /dev/null
+
+# --- git-lock init is assured ---
+
+cmd="$1"
+shift
+
+if [[ "$cmd" == "show" ]]; then
+    git_lock_show
+    exit
+fi
+
+TMPDIR="$(mktemp -d)"
+trap "rm -rf \"$TMPDIR\"" EXIT
+
+WORKTREE="$TMPDIR/tree"
+mkdir -p "$WORKTREE"
+
+if git show-ref --quiet "$BRANCHPATH"; then
+    git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- "$LOCKFILE"
+fi
+
+echo "Updated at $(date)" >> "$WORKTREE/$LOCKFILE"
+
+blob=$(git hash-object -w "$WORKTREE/$LOCKFILE")
+
+tree=$(echo "100644 blob $blob	$LOCKFILE" | git mktree)
+
+parent=$(git rev-parse "$BRANCHPATH")
+commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
+
+git update-ref "$BRANCHPATH" "$commit"
+
+git_lock_push
