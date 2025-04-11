@@ -14,8 +14,10 @@ BRANCHPATH="refs/heads/${BRANCH}"
 BRANCHREMOTE="refs/remotes/${REMOTE}/${BRANCH}"
 LOCKFILE="git-lock"
 MSG="Update git-lock"
-TOPLEVEL="$(git rev-parse --show-toplevel)"
+TOPLEVEL="$(realpath "$(git rev-parse --show-toplevel)")"
+TOPLEVEL_C="$(echo "$TOPLEVEL" | wc -c)"
 
+ORIG_PWD="$(pwd -P)"
 pushd "$TOPLEVEL" >> /dev/null
 
 git_lock_init_local() {
@@ -48,6 +50,21 @@ git_lock_push() {
 
 git_lock_fetch() {
     git fetch "$REMOTE" "${BRANCH}:${BRANCH}" >> /dev/null
+}
+
+git_lock_acquire() {
+    path="$1"
+
+    git_lock_fetch
+
+    grep -Fx "${path}" "$WORKTREE/$LOCKFILE" >> /dev/null
+
+    if [[ $? -eq 0 ]]; then
+        echo "Lock is held"
+        exit
+    fi
+
+    echo "$path" >> "$WORKTREE/$LOCKFILE"
 }
 
 git fetch >> /dev/null 2>&1
@@ -84,6 +101,45 @@ mkdir -p "$WORKTREE"
 
 if git show-ref --quiet "$BRANCHPATH"; then
     git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- "$LOCKFILE"
+fi
+
+if [[ "$cmd" == "acquire" ]]; then
+    to_lock="$1"
+    shift
+
+    if [[ -z "$to_lock" ]]; then
+        echo "No file path given"
+        exit
+    fi
+
+    to_lock="$(realpath -P "${ORIG_PWD}/${to_lock}")"
+    to_lock="$(echo "$to_lock" | cut -c "$(($TOPLEVEL_C+1))"-)"
+
+    if [[ ! -e "$to_lock" ]]; then
+        echo "File does not exist: $to_lock"
+        exit
+    fi
+
+    git show "HEAD:$to_lock" >> /dev/null 2>&1
+
+    if [[ ! $? -eq 0 ]]; then
+        echo "File is not committed to git: $to_lock"
+        exit
+    fi
+
+    git_lock_acquire "$to_lock"
+
+    blob=$(git hash-object -w "$WORKTREE/$LOCKFILE")
+
+    tree=$(echo "100644 blob $blob	$LOCKFILE" | git mktree)
+
+    parent=$(git rev-parse "$BRANCHPATH")
+    commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
+
+    git update-ref "$BRANCHPATH" "$commit"
+
+    git_lock_push
+    exit
 fi
 
 echo "Updated at $(date)" >> "$WORKTREE/$LOCKFILE"
