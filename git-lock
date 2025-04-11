@@ -14,6 +14,9 @@ BRANCHPATH="refs/heads/${BRANCH}"
 BRANCHREMOTE="refs/remotes/${REMOTE}/${BRANCH}"
 LOCKFILE="git-lock"
 MSG="Update git-lock"
+TOPLEVEL="$(git rev-parse --show-toplevel)"
+
+pushd "$TOPLEVEL" >> /dev/null
 
 git_lock_init_local() {
     echo "Creating locking branch..."
