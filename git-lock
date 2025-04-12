@@ -127,25 +127,27 @@ if git show-ref --quiet "$BRANCHPATH"; then
     git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- .
 fi
 
-function build_tree_for_file() {
-    local filepath="$1"
-    local fullpath="$2"
+function build_tree() {
+    local path="$1"
+    local entries=""
 
-    local filename="$(basename "$filepath")"
-    local dirpath="$(dirname "$filepath")"
-
-    local blob=$(git hash-object -w "$fullpath")
-
-    local entry="100644 blob $blob	$filename"
-    local tree="$(echo "$entry" | git-mktree)"
-
-    while [ "$dirpath" != "." ]; do
-        local dirname="$(basename "$dirpath")"
-        tree=$(echo "040000 tree $tree	$dirname" | git-mktree)
-        dirpath="$(dirname "$dirpath")"
+    for f in "$path"/*; do
+        if [[ -d "$f" ]]; then
+            local subtree="$(build_tree "$f")"
+            if [[ ! -z "$entries" ]]; then entries+=$'\n'; fi
+            entries+="040000 tree $subtree	$(basename "$f")"
+        fi
     done
 
-    echo "$tree"
+    for f in "$path"/*; do
+        if [[ -f "$f" ]]; then
+            local blob=$(git hash-object -w "$f")
+            if [[ ! -z "$entries" ]]; then entries+=$'\n'; fi
+            entries+="${sep}100644 blob $blob	$(basename "$f")"
+        fi
+    done
+
+    echo "$entries" | git mktree
 }
 
 if [[ "$cmd" == "show" ]]; then
@@ -184,7 +186,7 @@ if [[ "$cmd" == "acquire" ]]; then
 
     git_lock_acquire "$WORKTREE/$to_lock"
 
-    tree=$(build_tree_for_file "$to_lock" "$WORKTREE/$to_lock")
+    tree=$(build_tree "$WORKTREE")
 
     parent=$(git rev-parse "$BRANCHPATH")
     commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
@@ -209,7 +211,7 @@ if [[ "$cmd" == "release" ]]; then
 
     git_lock_release "$WORKTREE/$to_lock"
 
-    tree=$(build_tree_for_file "$to_lock" "$WORKTREE/$to_lock")
+    tree=$(build_tree "$WORKTREE")
 
     parent=$(git rev-parse "$BRANCHPATH")
     commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
