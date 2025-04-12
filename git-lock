@@ -41,6 +41,7 @@ git_lock_push() {
 
     if [[ ! $? -eq 0 ]]; then
         echo "Error: Unable to push locking branch to $REMOTE"
+        git update-ref "$BRANCHPATH" "$BRANCHREMOTE"
         exit
     fi
 
