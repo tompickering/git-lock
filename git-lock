@@ -204,18 +204,18 @@ if [[ "$cmd" == "acquire" ]]; then
 fi
 
 if [[ "$cmd" == "release" ]]; then
-    to_lock="$1"
+    to_release="$1"
     shift
 
-    if [[ -z "$to_lock" ]]; then
+    if [[ -z "$to_release" ]]; then
         echo "No file path given"
         exit
     fi
 
-    to_lock="$(realpath -P "${ORIG_PWD}/${to_lock}")"
-    to_lock="$(echo "$to_lock" | cut -c "$(($TOPLEVEL_C+1))"-)"
+    to_release="$(realpath -P "${ORIG_PWD}/${to_release}")"
+    to_release="$(echo "$to_release" | cut -c "$(($TOPLEVEL_C+1))"-)"
 
-    git_lock_release "$WORKTREE/$to_lock"
+    git_lock_release "$WORKTREE/$to_release"
 
     tree=$(build_tree "$WORKTREE")
 
