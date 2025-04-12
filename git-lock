@@ -66,6 +66,7 @@ git_lock_acquire() {
         exit
     fi
 
+    mkdir -p "$(dirname "$path")"
     echo "$USER" >> "$path"
 }
 
@@ -105,6 +106,27 @@ if git show-ref --quiet "$BRANCHPATH"; then
     git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- .
 fi
 
+function build_tree_for_file() {
+    local filepath="$1"
+    local fullpath="$2"
+
+    local filename="$(basename "$filepath")"
+    local dirpath="$(dirname "$filepath")"
+
+    local blob=$(git hash-object -w "$fullpath")
+
+    local entry="100644 blob $blob	$filename"
+    local tree="$(echo "$entry" | git-mktree)"
+
+    while [ "$dirpath" != "." ]; do
+        local dirname="$(basename "$dirpath")"
+        tree=$(echo "040000 tree $tree	$dirname" | git-mktree)
+        dirpath="$(dirname "$dirpath")"
+    done
+
+    echo "$tree"
+}
+
 if [[ "$cmd" == "acquire" ]]; then
     to_lock="$1"
     shift
@@ -131,9 +153,7 @@ if [[ "$cmd" == "acquire" ]]; then
 
     git_lock_acquire "$WORKTREE/$to_lock"
 
-    blob=$(git hash-object -w "$WORKTREE/$to_lock")
-
-    tree=$(echo "100644 blob $blob	$to_lock" | git mktree)
+    tree=$(build_tree_for_file "$to_lock" "$WORKTREE/$to_lock")
 
     parent=$(git rev-parse "$BRANCHPATH")
     commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
