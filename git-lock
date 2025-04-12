@@ -36,10 +36,6 @@ git_lock_init_local() {
     git clean -f "$LOCKFILE" >> /dev/null
 }
 
-git_lock_show() {
-    git show "$BRANCH:$LOCKFILE" | cat
-}
-
 git_lock_push() {
     git push "$REMOTE" "$BRANCHPATH:$BRANCHPATH" >> /dev/null 2>&1
 
@@ -53,6 +49,13 @@ git_lock_push() {
 
 git_lock_fetch() {
     git fetch "$REMOTE" "${BRANCH}:${BRANCH}" >> /dev/null
+}
+
+git_lock_show() {
+    treepath="$1"
+    pushd "$treepath" >> /dev/null
+    find -type f -size +0 -exec echo -n {}"	" \; -exec  head -n 1 {} \;
+    popd >> /dev/null
 }
 
 git_lock_acquire() {
@@ -114,11 +117,6 @@ git_lock_fetch
 cmd="$1"
 shift
 
-if [[ "$cmd" == "show" ]]; then
-    git_lock_show
-    exit
-fi
-
 TMPDIR="$(mktemp -d)"
 trap "rm -rf \"$TMPDIR\"" EXIT
 
@@ -149,6 +147,11 @@ function build_tree_for_file() {
 
     echo "$tree"
 }
+
+if [[ "$cmd" == "show" ]]; then
+    git_lock_show "$WORKTREE"
+    exit
+fi
 
 if [[ "$cmd" == "acquire" ]]; then
     to_lock="$1"
