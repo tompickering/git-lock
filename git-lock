@@ -16,7 +16,7 @@ LOCKFILE=".git-lock"
 MSG="Update git-lock"
 TOPLEVEL="$(realpath "$(git rev-parse --show-toplevel)")"
 TOPLEVEL_C="$(echo "$TOPLEVEL" | wc -c)"
-USER=$(git config user.name)
+USER="$(git config user.name) <$(git config user.email)>"
 
 ORIG_PWD="$(pwd -P)"
 pushd "$TOPLEVEL" >> /dev/null
