@@ -40,7 +40,7 @@ git_lock_push() {
     git push "$REMOTE" "$BRANCHPATH:$BRANCHPATH" >> /dev/null 2>&1
 
     if [[ ! $? -eq 0 ]]; then
-        echo "Unable to push locking branch to $REMOTE"
+        echo "Error: Unable to push locking branch to $REMOTE"
         exit
     fi
 
