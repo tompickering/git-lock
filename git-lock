@@ -49,6 +49,11 @@ git_lock_push() {
 
 git_lock_fetch() {
     git fetch "$REMOTE" "${BRANCH}:${BRANCH}" >> /dev/null
+
+    if [[ ! $? -eq 0 ]]; then
+        echo "Error: Unable to sync lock branch from $REMOTE"
+        exit
+    fi
 }
 
 git_lock_show() {
