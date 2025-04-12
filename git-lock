@@ -70,6 +70,29 @@ git_lock_acquire() {
     echo "$USER" >> "$path"
 }
 
+git_lock_release() {
+    path="$1"
+
+    git_lock_fetch
+
+    if [[ ! -e "$path" ]] || [[ ! -s "$path" ]]; then
+        echo "Lock not held"
+        exit
+    fi
+
+    owner=$(head -n 1 "$path")
+
+    if [[ $owner != $USER ]]; then
+        echo "LOCK IS HELD BY SOMEONE ELSE ($owner)"
+        read -e -p "Release anyway? [y/N] " yesno
+        if [[ ! "$yesno" == [Yy]* ]]; then
+            exit
+        fi
+    fi
+
+    > "$path"
+}
+
 git fetch >> /dev/null 2>&1
 
 git rev-parse "$BRANCHREMOTE" >> /dev/null 2>&1
@@ -152,6 +175,31 @@ if [[ "$cmd" == "acquire" ]]; then
     fi
 
     git_lock_acquire "$WORKTREE/$to_lock"
+
+    tree=$(build_tree_for_file "$to_lock" "$WORKTREE/$to_lock")
+
+    parent=$(git rev-parse "$BRANCHPATH")
+    commit=$(echo "$MSG" | git commit-tree $tree -p $parent)
+
+    git update-ref "$BRANCHPATH" "$commit"
+
+    git_lock_push
+    exit
+fi
+
+if [[ "$cmd" == "release" ]]; then
+    to_lock="$1"
+    shift
+
+    if [[ -z "$to_lock" ]]; then
+        echo "No file path given"
+        exit
+    fi
+
+    to_lock="$(realpath -P "${ORIG_PWD}/${to_lock}")"
+    to_lock="$(echo "$to_lock" | cut -c "$(($TOPLEVEL_C+1))"-)"
+
+    git_lock_release "$WORKTREE/$to_lock"
 
     tree=$(build_tree_for_file "$to_lock" "$WORKTREE/$to_lock")
 
