@@ -170,6 +170,11 @@ if [[ "$cmd" == "acquire" ]]; then
         exit
     fi
 
+    if [[ ! -f "$to_lock" ]]; then
+        echo "Not a regular file: $to_lock"
+        exit
+    fi
+
     git show "HEAD:$to_lock" >> /dev/null 2>&1
 
     if [[ ! $? -eq 0 ]]; then
