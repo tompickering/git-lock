@@ -126,7 +126,7 @@ shift
 TMPDIR="$(mktemp -d)"
 trap "rm -rf \"$TMPDIR\"" EXIT
 
-WORKTREE="$TMPDIR/tree"
+WORKTREE="$TMPDIR"
 mkdir -p "$WORKTREE"
 
 if git show-ref --quiet "$BRANCHPATH"; then
