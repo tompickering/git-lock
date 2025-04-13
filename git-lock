@@ -76,7 +76,7 @@ git_lock_acquire() {
     fi
 
     mkdir -p "$(dirname "$path")"
-    echo "$USER" >> "$path"
+    echo "$USER" > "$path"
 }
 
 git_lock_release() {
