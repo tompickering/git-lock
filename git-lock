@@ -34,11 +34,98 @@ USER="$(git config user.name) <$(git config user.email)>"
 ORIG_PWD="$(pwd -P)"
 pushd "$TOPLEVEL" >> /dev/null
 
+GITDIR="$(git rev-parse --git-common-dir)"
+
 # This is useful when running in a hook and git has locked the index
 if [[ $1 == "--clone" ]]; then
     clone=1
     shift
 fi
+
+HOOK_TAG="### git-lock"
+
+HOOK_PRE_COMMIT='''#!/bin/bash
+'''
+
+HOOK_PRE_COMMIT+="""
+CFG_LOCK_NO_BLOCK_COMMIT=\"$CFG_LOCK_NO_BLOCK_COMMIT\"
+"""
+
+HOOK_PRE_COMMIT+='''
+NO_BLOCK_COMMIT_CFG="$(git config "$CFG_LOCK_NO_BLOCK_COMMIT")"
+
+echo
+echo "=== git-lock pre-commit ==="
+
+any_locks=0
+
+shopt -s lastpipe
+
+git diff --cached --name-only | while read file; do
+    owner="$(git lock --clone check "$file")"
+    if [[ ! $? -eq 0 ]]; then
+        any_locks=1
+        echo LOCKED BY $owner: $file
+    fi
+done
+
+if [[ ! $any_locks == 0 ]]; then
+    if [[ "$NO_BLOCK_COMMIT_CFG" == 1 ]]; then
+        echo
+        echo "IGNORING DUE TO $CFG_LOCK_NO_BLOCK_COMMIT"
+    fi
+fi
+
+echo "==========================="
+echo
+
+if [[ ! $any_locks == 0 ]]; then
+    if [[ "$NO_BLOCK_COMMIT_CFG" == 1 ]]; then
+        x=5
+        while [[ $x -gt 0 ]]; do
+            echo -ne "\rContinuing in $x"
+            x=$((x-1))
+            sleep 1
+        done
+    else
+        exit 1
+    fi
+fi
+
+'''
+
+git_lock_install_hooks() {
+    HOOKDIR="$GITDIR/hooks"
+    HOOKDIR_GITLOCK="$HOOKDIR/git-lock"
+    mkdir -p "$HOOKDIR_GITLOCK"
+
+    echo "$HOOK_PRE_COMMIT" > "$HOOKDIR_GITLOCK/pre-commit"
+    chmod +x "$HOOKDIR_GITLOCK/pre-commit"
+
+    hook="$HOOKDIR/pre-commit"
+
+    if [[ ! -e "$hook" ]]; then
+        touch "$hook"
+        chmod +x "$hook"
+    fi
+
+    if [[ ! -x "$hook" ]]; then
+        echo "WARNING: You have a pre-commit hook which is not executable"
+        read -e -p "Configure executable (thereby enabling any other functionality)? [y/N]" yesno
+        if [[ ! "$yesno" == [Yy]* ]]; then
+            echo "Aborting"
+            exit 1
+        fi
+        chmod +x "$hook"
+    fi
+
+    if ! grep -qx "$HOOK_TAG" "$HOOKDIR/pre-commit"; then
+        echo "Integrating pre-commit hook"
+        echo "$HOOK_TAG" >> "$GITDIR/hooks/pre-commit"
+        echo 'DIR="$(git rev-parse --absolute-git-dir)"' >> "$GITDIR/hooks/pre-commit"
+        echo '$DIR/hooks/git-lock/pre-commit' >> "$GITDIR/hooks/pre-commit"
+    fi
+}
 
 git_lock_init_local() {
     echo "Creating locking branch..."
@@ -136,6 +223,8 @@ git_lock_release() {
     > "$path"
 }
 
+git_lock_install_hooks
+
 git fetch >> /dev/null 2>&1
 
 git rev-parse "$BRANCHREMOTE" >> /dev/null 2>&1
@@ -175,7 +264,7 @@ if [[ -z "$clone" ]]; then
         exit 1
     fi
 else
-    if ! git clone "$REMOTEPATH" --branch "$BRANCH" --single-branch "$WORKTREE" >> /dev/null; then
+    if ! git clone "$REMOTEPATH" --branch "$BRANCH" --single-branch "$WORKTREE" >> /dev/null 2>&1; then
         echo "Error: Unable to clone $REMOTEPATH"
         if [[ "$NO_BLOCK_COMMIT_CFG" == 1 ]]; then
             exit 0
