@@ -7,6 +7,13 @@ if [[ ! $? -eq 0 ]]; then
     exit 1
 fi
 
+if [[ ! -z "$1" && -f "$1" ]]; then
+    read -e -p "Did you mean to run 'git lock acquire'? [Y/n] " yesno
+    if [[ ! "$yesno" == [Nn]* ]]; then
+        cmd="acquire"
+    fi
+fi
+
 REMOTE_CFG="$(git config lock.remote)"
 REMOTE=${REMOTE_CFG:-origin}
 BRANCH="git-lock"
@@ -135,8 +142,10 @@ git_lock_fetch
 
 # --- git-lock init is assured ---
 
-cmd="$1"
-shift
+if [[ -z "$cmd" ]]; then
+    cmd="$1"
+    shift
+fi
 
 TMPDIR="$(mktemp -d)"
 trap "rm -rf \"$TMPDIR\"" EXIT
