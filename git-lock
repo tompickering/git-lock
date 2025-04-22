@@ -60,7 +60,7 @@ git_lock_fetch() {
 git_lock_show() {
     treepath="$1"
     pushd "$treepath" >> /dev/null
-    find -type f -size +0 -exec echo -n {}"	" \; -exec  head -n 1 {} \;
+    find  -not -path "./.git" -not -path "./.git/*" -type f -size +0 -exec echo -n {}"	" \; -exec  head -n 1 {} \;
     popd >> /dev/null
 }
 
