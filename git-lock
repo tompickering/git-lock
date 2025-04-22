@@ -4,7 +4,7 @@ git rev-parse --is-inside-work-tree >> /dev/null 2>&1
 
 if [[ ! $? -eq 0 ]]; then
     echo "Not inside a git repo"
-    exit
+    exit 1
 fi
 
 REMOTE_CFG="$(git config lock.remote)"
@@ -42,7 +42,7 @@ git_lock_push() {
     if [[ ! $? -eq 0 ]]; then
         echo "Error: Unable to push locking branch to $REMOTE"
         git update-ref "$BRANCHPATH" "$BRANCHREMOTE"
-        exit
+        exit 1
     fi
 
     echo "Lock updated"
@@ -53,7 +53,7 @@ git_lock_fetch() {
 
     if [[ ! $? -eq 0 ]]; then
         echo "Error: Unable to sync lock branch from $REMOTE"
-        exit
+        exit 1
     fi
 }
 
@@ -72,7 +72,7 @@ git_lock_acquire() {
     if [[ -e "$path" ]] && [[ -s "$path" ]]; then
         owner=$(head -n 1 "$path")
         echo "Lock is held by ${owner}"
-        exit
+        exit 1
     fi
 
     mkdir -p "$(dirname "$path")"
@@ -86,7 +86,7 @@ git_lock_release() {
 
     if [[ ! -e "$path" ]] || [[ ! -s "$path" ]]; then
         echo "Lock not held"
-        exit
+        exit 1
     fi
 
     owner=$(head -n 1 "$path")
@@ -95,7 +95,7 @@ git_lock_release() {
         echo "LOCK IS HELD BY SOMEONE ELSE ($owner)"
         read -e -p "Release anyway? [y/N] " yesno
         if [[ ! "$yesno" == [Yy]* ]]; then
-            exit
+            exit 1
         fi
     fi
 
@@ -167,7 +167,7 @@ if [[ "$cmd" == "acquire" ]]; then
 
     if [[ -z "$to_lock" ]]; then
         echo "No file path given"
-        exit
+        exit 1
     fi
 
     to_lock="$(realpath -P "${ORIG_PWD}/${to_lock}")"
@@ -175,19 +175,19 @@ if [[ "$cmd" == "acquire" ]]; then
 
     if [[ ! -e "$to_lock" ]]; then
         echo "File does not exist: $to_lock"
-        exit
+        exit 1
     fi
 
     if [[ ! -f "$to_lock" ]]; then
         echo "Not a regular file: $to_lock"
-        exit
+        exit 1
     fi
 
     git show "HEAD:$to_lock" >> /dev/null 2>&1
 
     if [[ ! $? -eq 0 ]]; then
         echo "File is not committed to git: $to_lock"
-        exit
+        exit 1
     fi
 
     git_lock_acquire "$WORKTREE/$to_lock"
@@ -209,7 +209,7 @@ if [[ "$cmd" == "release" ]]; then
 
     if [[ -z "$to_release" ]]; then
         echo "No file path given"
-        exit
+        exit 1
     fi
 
     to_release="$(realpath -P "${ORIG_PWD}/${to_release}")"
