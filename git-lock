@@ -83,6 +83,9 @@ git_lock_acquire() {
 
     if [[ -e "$path" ]] && [[ -s "$path" ]]; then
         owner=$(head -n 1 "$path")
+        if [[ $owner == $USER ]]; then
+            owner="you"
+        fi
         echo "Lock is held by ${owner}"
         exit 1
     fi
