@@ -142,7 +142,7 @@ WORKTREE="$TMPDIR"
 mkdir -p "$WORKTREE"
 
 if git show-ref --quiet "$BRANCHPATH"; then
-    git --work-tree="$WORKTREE" checkout "$BRANCHPATH" -- .
+    git worktree add "$WORKTREE" "$BRANCHPATH" >> /dev/null
 fi
 
 function build_tree() {
