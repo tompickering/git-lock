@@ -64,6 +64,18 @@ git_lock_show() {
     popd >> /dev/null
 }
 
+git_lock_check() {
+    path="$1"
+
+    if [[ -f "$path" ]] && [[ -s "$path" ]]; then
+        owner=$(head -n 1 "$path")
+        if [[ $owner != $USER ]]; then
+            echo "${owner}"
+            exit 1
+        fi
+    fi
+}
+
 git_lock_acquire() {
     path="$1"
 
@@ -158,6 +170,21 @@ function build_tree() {
 
 if [[ "$cmd" == "show" ]]; then
     git_lock_show "$WORKTREE"
+    exit
+fi
+
+if [[ "$cmd" == "check" ]]; then
+    to_check="$1"
+    shift
+
+    if [[ -z "$to_check" ]]; then
+        exit
+    fi
+
+    to_check="$(realpath -P "${ORIG_PWD}/${to_check}")"
+    to_check="$(echo "$to_check" | cut -c "$(($TOPLEVEL_C+1))"-)"
+
+    git_lock_check "$WORKTREE/$to_check"
     exit
 fi
 
