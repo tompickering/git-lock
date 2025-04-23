@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#OPT="--clone"
+
 die() {
     echo "Test failed"
     exit 1
@@ -29,24 +31,24 @@ git clone REPO LOCAL1
 pushd LOCAL0 >> /dev/null
 git config user.name "Local 0"
 git config user.email "local0@git.lock"
-if ! git lock acquire a.txt; then die; fi
-if ! git lock acquire d0/d1/b.txt; then die; fi
-if ! git lock acquire d0/d1/c.txt; then die; fi
+if ! git lock $OPT acquire a.txt; then die; fi
+if ! git lock $OPT acquire d0/d1/b.txt; then die; fi
+if ! git lock $OPT acquire d0/d1/c.txt; then die; fi
 popd >> /dev/null
 
 pushd LOCAL1 >> /dev/null
 git config user.name "Local 1"
 git config user.email "local1@git.lock"
-if git lock acquire d0/d1/b.txt; then die; fi
-if ! git lock acquire d0/b.txt; then die; fi
+if git lock $OPT acquire d0/d1/b.txt; then die; fi
+if ! git lock $OPT acquire d0/b.txt; then die; fi
 popd >> /dev/null
 
 pushd LOCAL0 >> /dev/null
-if ! git lock release d0/d1/b.txt; then die; fi
+if ! git lock $OPT release d0/d1/b.txt; then die; fi
 popd >> /dev/null
 
 pushd LOCAL1 >> /dev/null
-if ! git lock acquire d0/d1/b.txt; then die; fi
+if ! git lock $OPT acquire d0/d1/b.txt; then die; fi
 popd >> /dev/null
 
 popd >> /dev/null
