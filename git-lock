@@ -15,10 +15,13 @@ if [[ ! -z "$1" && -f "$1" ]]; then
 fi
 
 CFG_LOCK_REMOTE="lock.remote"
+CFG_LOCK_NO_BLOCK_COMMIT="lock.noblockcommit"
 
 REMOTE_CFG="$(git config "$CFG_LOCK_REMOTE")"
+NO_BLOCK_COMMIT_CFG="$(git config "$CFG_LOCK_NO_BLOCK_COMMIT")"
 
 REMOTE=${REMOTE_CFG:-origin}
+REMOTEPATH="$(git remote -v | grep "^$REMOTE\s" | head -n 1 | cut -d '	' -f 2 | cut -d ' ' -f 1)"
 BRANCH="git-lock"
 BRANCHPATH="refs/heads/${BRANCH}"
 BRANCHREMOTE="refs/remotes/${REMOTE}/${BRANCH}"
@@ -30,6 +33,12 @@ USER="$(git config user.name) <$(git config user.email)>"
 
 ORIG_PWD="$(pwd -P)"
 pushd "$TOPLEVEL" >> /dev/null
+
+# This is useful when running in a hook and git has locked the index
+if [[ $1 == "--clone" ]]; then
+    clone=1
+    shift
+fi
 
 git_lock_init_local() {
     echo "Creating locking branch..."
@@ -156,8 +165,27 @@ trap "rm -rf \"$TMPDIR\"" EXIT
 WORKTREE="$TMPDIR"
 mkdir -p "$WORKTREE"
 
-if git show-ref --quiet "$BRANCHPATH"; then
-    git worktree add "$WORKTREE" "$BRANCHPATH" >> /dev/null
+if [[ -z "$clone" ]]; then
+    if git show-ref --quiet "$BRANCHPATH"; then
+        if ! git worktree add "$WORKTREE" "$BRANCHPATH" >> /dev/null; then
+            exit 1
+        fi
+    else
+        echo "Error: Unable to find branch $BRANCHPATH"
+        exit 1
+    fi
+else
+    if ! git clone "$REMOTEPATH" --branch "$BRANCH" --single-branch "$WORKTREE" >> /dev/null; then
+        echo "Error: Unable to clone $REMOTEPATH"
+        if [[ "$NO_BLOCK_COMMIT_CFG" == 1 ]]; then
+            exit 0
+        else
+            echo "COMMIT BLOCKED"
+            echo "To allow commits when remote is not available, set:"
+            echo "git config $CFG_LOCK_NO_BLOCK_COMMIT 1"
+            exit 1
+        fi
+    fi
 fi
 
 function build_tree() {
