@@ -85,6 +85,7 @@ if [[ ! $any_locks == 0 ]]; then
             x=$((x-1))
             sleep 1
         done
+        echo
     else
         exit 1
     fi
