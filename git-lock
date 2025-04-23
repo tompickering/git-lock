@@ -134,7 +134,7 @@ git_lock_init_local() {
     # An empty commit here can confuse checkout of worktree
     true > "$LOCKFILE"
     git add "$LOCKFILE" >> /dev/null
-    git commit -m "Init git-lock" >> /dev/null
+    git commit --no-verify -m "Init git-lock" >> /dev/null
     echo "$current" > .git/HEAD
     git reset
     git clean -f "$LOCKFILE" >> /dev/null
