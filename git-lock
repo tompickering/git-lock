@@ -14,7 +14,10 @@ if [[ ! -z "$1" && -f "$1" ]]; then
     fi
 fi
 
-REMOTE_CFG="$(git config lock.remote)"
+CFG_LOCK_REMOTE="lock.remote"
+
+REMOTE_CFG="$(git config "$CFG_LOCK_REMOTE")"
+
 REMOTE=${REMOTE_CFG:-origin}
 BRANCH="git-lock"
 BRANCHPATH="refs/heads/${BRANCH}"
