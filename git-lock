@@ -14,9 +14,11 @@ fi
 
 CFG_LOCK_REMOTE="lock.remote"
 CFG_LOCK_NO_BLOCK_COMMIT="lock.noblockcommit"
+CFG_LOCK_NO_BLOCK_PUSH="lock.noblockpush"
 
 REMOTE_CFG="$(git config "$CFG_LOCK_REMOTE")"
 NO_BLOCK_COMMIT_CFG="$(git config "$CFG_LOCK_NO_BLOCK_COMMIT")"
+NO_BLOCK_PUSH_CFG="$(git config "$CFG_LOCK_NO_BLOCK_PUSH")"
 
 REMOTE=${REMOTE_CFG:-origin}
 REMOTEPATH="$(git remote -v | grep "^$REMOTE\s" | head -n 1 | cut -d '	' -f 2 | cut -d ' ' -f 1)"
@@ -93,15 +95,73 @@ fi
 
 '''
 
-git_lock_install_hooks() {
-    HOOKDIR="$GITDIR/hooks"
-    HOOKDIR_GITLOCK="$HOOKDIR/git-lock"
-    mkdir -p "$HOOKDIR_GITLOCK"
+HOOK_PRE_PUSH='''#!/bin/bash
+'''
 
-    echo "$HOOK_PRE_COMMIT" > "$HOOKDIR_GITLOCK/pre-commit"
-    chmod +x "$HOOKDIR_GITLOCK/pre-commit"
+HOOK_PRE_PUSH+="""
+CFG_LOCK_NO_BLOCK_PUSH=\"$CFG_LOCK_NO_BLOCK_PUSH\"
+"""
 
-    hook="$HOOKDIR/pre-commit"
+HOOK_PRE_PUSH+='''
+NO_BLOCK_PUSH_CFG="$(git config "$CFG_LOCK_NO_BLOCK_PUSH")"
+
+remote="$1"
+
+upstream="$(git rev-parse --symbolic-full-name @{u})"
+
+echo
+echo "=== git-lock pre-push ==="
+
+any_locks=0
+
+if [[ $? -eq 0 ]]; then
+    git fetch "$remote"
+
+    shopt -s lastpipe
+
+    git diff "$upstream" HEAD --name-only | while read file; do
+        owner="$(git lock --clone check "$file")"
+        if [[ ! $? -eq 0 ]]; then
+            any_locks=1
+            echo LOCKED BY $owner: $file
+        fi
+    done
+
+    if [[ ! $any_locks == 0 ]]; then
+        if [[ "$NO_BLOCK_PUSH_CFG" == 1 ]]; then
+            echo
+            echo "IGNORING DUE TO $CFG_LOCK_NO_BLOCK_PUSH"
+        fi
+    fi
+fi
+
+echo "========================="
+echo
+
+if [[ ! $any_locks == 0 ]]; then
+    if [[ "$NO_BLOCK_PUSH_CFG" == 1 ]]; then
+        x=5
+        while [[ $x -gt 0 ]]; do
+            echo -ne "\rContinuing in $x"
+            x=$((x-1))
+            sleep 1
+        done
+        echo
+    else
+        exit 1
+    fi
+fi
+
+'''
+
+git_lock_install_hook() {
+    hookdir="$1"
+    shift
+
+    hookname="$1"
+    shift
+
+    hook="$hookdir/$hookname"
 
     if [[ ! -e "$hook" ]]; then
         touch "$hook"
@@ -109,7 +169,7 @@ git_lock_install_hooks() {
     fi
 
     if [[ ! -x "$hook" ]]; then
-        echo "WARNING: You have a pre-commit hook which is not executable"
+        echo "WARNING: You have a $hookname hook which is not executable"
         read -e -p "Configure executable (thereby enabling any other functionality)? [y/N]" yesno
         if [[ ! "$yesno" == [Yy]* ]]; then
             echo "Aborting"
@@ -118,12 +178,27 @@ git_lock_install_hooks() {
         chmod +x "$hook"
     fi
 
-    if ! grep -qx "$HOOK_TAG" "$HOOKDIR/pre-commit"; then
-        echo "Integrating pre-commit hook"
-        echo "$HOOK_TAG" >> "$GITDIR/hooks/pre-commit"
-        echo 'DIR="$(git rev-parse --absolute-git-dir)"' >> "$GITDIR/hooks/pre-commit"
-        echo '$DIR/hooks/git-lock/pre-commit' >> "$GITDIR/hooks/pre-commit"
+    if ! grep -qx "$HOOK_TAG" "$hook"; then
+        echo "Integrating $hookname hook"
+        echo "$HOOK_TAG" >> "$hook"
+        echo 'DIR="$(git rev-parse --absolute-git-dir)"' >> "$hook"
+        echo '$DIR/hooks/git-lock/'"$hookname"' "$@"' >> "$hook"
     fi
+}
+
+git_lock_install_hooks() {
+    HOOKDIR="$GITDIR/hooks"
+    HOOKDIR_GITLOCK="$HOOKDIR/git-lock"
+    mkdir -p "$HOOKDIR_GITLOCK"
+
+    echo "$HOOK_PRE_COMMIT" > "$HOOKDIR_GITLOCK/pre-commit"
+    chmod +x "$HOOKDIR_GITLOCK/pre-commit"
+
+    echo "$HOOK_PRE_PUSH" > "$HOOKDIR_GITLOCK/pre-push"
+    chmod +x "$HOOKDIR_GITLOCK/pre-push"
+
+    git_lock_install_hook "$HOOKDIR" "pre-commit"
+    git_lock_install_hook "$HOOKDIR" "pre-push"
 }
 
 git_lock_init_local() {
