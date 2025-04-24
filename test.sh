@@ -23,10 +23,11 @@ echo 'lock' > d0/d1/b.txt
 echo '!' > d0/d1/c.txt
 git add .
 git commit -m "Initial commit"
+git checkout -b remote
 popd >> /dev/null
 
-git clone REPO LOCAL0
-git clone REPO LOCAL1
+git clone REPO LOCAL0 -b master
+git clone REPO LOCAL1 -b master
 
 pushd LOCAL0 >> /dev/null
 git config user.name "Local 0"
@@ -46,6 +47,12 @@ git add d0/d1/b.txt
 if git commit -m "This should fail"; then die; fi
 git config lock.noblockcommit 1
 if ! git commit -m "This should succeed"; then die; fi
+echo new >> d0/b.txt
+git add d0/b.txt
+if ! git commit -m "This should succeed"; then die; fi
+if git push origin master; then die; fi
+git config lock.noblockpush 1
+if ! git push origin master; then die; fi
 popd >> /dev/null
 
 pushd LOCAL0 >> /dev/null
