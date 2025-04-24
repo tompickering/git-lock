@@ -44,11 +44,17 @@ To check all your modified and staged files for locks held by anyone else:
 git lock check
 ```
 
-# Pre-Commit Hook
+## Pre-Commit Hook
 
 A pre-commit hook is installed the first time a `git lock` command is run. This will check if any of the staged files are locked by another user. If so - or if the latest lock data cannot be fetched from the remote - the commit is aborted.
 
 To disable this enforcement, set `git config lock.noblockcommit 1`. In this case, the commit will be allowed if lock information cannot be synced. If a lock breach is detected, a report will be displayed for several seconds before the commit process continues.
+
+## Pre-Push Hook
+
+A pre-push hook is installed the first time a `git lock` command is run. If the branch to be pushed has an upstream branch on the remote, the delta between this and the local branch will be checked for any modified files which have been locked by another user. If so, the push is aborted.
+
+To disable this enforcement, set `git config lock.noblockpush 1`. In this case, if a lock breach is detected, a report will be displayed for several seconds before the push continues.
 
 ## How does it work?
 
