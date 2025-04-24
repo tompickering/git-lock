@@ -1,0 +1,4 @@
+Tests for git-lock using behave
+
+Install with: pip3 install behave
+Run with: python3 -m behave
