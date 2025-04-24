@@ -142,7 +142,7 @@ git_lock_init_local() {
 }
 
 git_lock_push() {
-    if ! git push "$REMOTE" "$BRANCHPATH:$BRANCHPATH" >> /dev/null 2>&1; then
+    if ! git push --no-verify "$REMOTE" "$BRANCHPATH:$BRANCHPATH" >> /dev/null 2>&1; then
         echo "Error: Unable to push locking branch to $REMOTE"
         git update-ref "$BRANCHPATH" "$BRANCHREMOTE"
         exit 1
