@@ -27,7 +27,9 @@ Feature: File locking
         Then LOCAL0 a.txt is not locked
         And LOCAL0 a.txt check succeeds
         And LOCAL0 git-lock show does not contain ./a.txt	User0 <user0@git.lock>
+        And LOCAL0 cannot release a.txt
         And LOCAL0 can lock a.txt
+        And LOCAL0 can release a.txt
 
     Scenario: A user checks another user's lock
         Given a git repo REPO

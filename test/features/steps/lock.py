@@ -88,6 +88,16 @@ def step_impl(context, repo, path):
     cwd = context.repos[repo].name
     assert subprocess.run(['git', 'lock', 'acquire', path], cwd=cwd).returncode != 0
 
+@then('{repo} can release {path}')
+def step_impl(context, repo, path):
+    cwd = context.repos[repo].name
+    subprocess.check_output(['git', 'lock', 'release', path], cwd=cwd)
+
+@then('{repo} cannot release {path}')
+def step_impl(context, repo, path):
+    cwd = context.repos[repo].name
+    assert subprocess.run(['git', 'lock', 'release', path], cwd=cwd).returncode != 0
+
 @then('{repo} {path} check succeeds')
 def step_impl(context, path, repo):
     cwd = context.repos[repo].name
