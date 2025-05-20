@@ -164,7 +164,8 @@ git_lock_install_hook() {
     hook="$hookdir/$hookname"
 
     if [[ ! -e "$hook" ]]; then
-        touch "$hook"
+        echo "#!/bin/sh" > "$hook"
+        echo >> "$hook"
         chmod +x "$hook"
     fi
 
