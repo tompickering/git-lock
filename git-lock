@@ -168,7 +168,13 @@ git_lock_install_hook() {
         chmod +x "$hook"
     fi
 
-    if [[ ! -x "$hook" ]]; then
+    case "$(uname -s)" in
+        CYGWIN*)  win=1;;
+        MINGW*)   win=1;;
+        MSYS_NT*) win=1;;
+    esac
+
+    if [[ -z "$win" && ! -x "$hook" ]]; then
         echo "WARNING: You have a $hookname hook which is not executable"
         read -e -p "Configure executable (thereby enabling any other functionality)? [y/N]" yesno
         if [[ ! "$yesno" == [Yy]* ]]; then
